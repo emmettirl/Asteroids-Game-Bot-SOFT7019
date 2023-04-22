@@ -5,4 +5,5 @@ struct ship_action move_ship(int field[][FIELD_WIDTH], void *ship_state){
 
     struct ship_action turn = {-1,ship_state};
     return turn;
+
 }
