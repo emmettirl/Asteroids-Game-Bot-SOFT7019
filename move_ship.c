@@ -5,8 +5,13 @@ int findShipRow(int field[][FIELD_WIDTH]);
 int checkForCollision(int field[][FIELD_WIDTH], int currentColumn, int shipRow);
 int checkForOutOfBounds(int shipRow);
 int* findValidMoves(int field[][FIELD_WIDTH], int shipRow, int offsetTracker, int currentColumn);
+int findValidPath(int field[][FIELD_WIDTH],int  *validPathFound, int shipRow, int offsetTracker, int currentColumn, int *longestPathLength, int *longestPathMove, int currentMove);
 
-
+//this program calculates the next move for the ship.
+//it does this by finding the ship's row, then checking for valid moves
+//it then determines the best move to make based on the valid moves, by attempting to stay near the centre of the field.
+//it also tries to find a path which reaches the end of the frame, and ensure the selected move is part of that path.
+//if no valid path is found, it will select the longest path found.
 
 struct ship_action move_ship(int field[][FIELD_WIDTH], void *ship_state){
     // Your code should go here
@@ -25,86 +30,69 @@ struct ship_action move_ship(int field[][FIELD_WIDTH], void *ship_state){
     //find valid next moves
     int *validMoves = findValidMoves(field, shipRow, offsetTracker, currentColumn);
 
-    //determine next move from valid options, attempts to stay near centre of the field where possible
-    if (validMoves[1] == 1) {
-        nextMove = 0;
-    } else if (shipRow > 10)
-    {
-        if (validMoves[0] == 1) {
-            nextMove = -1;
-        } else {
-            nextMove = 1;
+    int counter = 0;
+    int maxIterations = 1000;
+    while (counter <= maxIterations) {
+        counter++;
+
+        if (counter == maxIterations) {
+            nextMove = longestPathMove;
+            break;
         }
-    } else {
-        if (validMoves[2] == 1) {
-            nextMove = 1;
+
+        //determine next move from valid options, attempts to stay near centre of the field where possible
+        if (validMoves[1] == 1) {
+            nextMove = 0;
+            if (findValidPath(field, &validPathFound, shipRow, offsetTracker, currentColumn, &longestPathLength, &longestPathMove, nextMove)){
+                break;
+            } else {
+                validMoves[1] = 0;
+                continue;
+            }
+
+        } else if (shipRow > 10) {
+            if (validMoves[0] == 1) {
+                nextMove = -1;
+                if (findValidPath(field, &validPathFound, shipRow, offsetTracker, currentColumn, &longestPathLength, &longestPathMove, nextMove)){
+                    break;
+                } else {
+                    validMoves[0] = 0;
+                    continue;
+                }
+            } else {
+                nextMove = 1;
+                if (findValidPath(field, &validPathFound, shipRow, offsetTracker, currentColumn, &longestPathLength, &longestPathMove, nextMove)){
+                    break;
+                } else {
+                    validMoves[0] = 0;
+                    continue;
+                }
+            }
         } else {
-            nextMove = -1;
+            if (validMoves[2] == 1) {
+                nextMove = 1;
+                if (findValidPath(field, &validPathFound, shipRow, offsetTracker, currentColumn, &longestPathLength, &longestPathMove, nextMove)){
+                    break;
+                } else {
+                    validMoves[2] = 0;
+                    continue;
+                }
+            } else {
+                nextMove = -1;
+                if (findValidPath(field, &validPathFound, shipRow, offsetTracker, currentColumn, &longestPathLength, &longestPathMove, nextMove)){
+                    break;
+                } else {
+                    validMoves[2] = 0;
+                    continue;
+                }
+            }
         }
+
+
     }
 
-    offsetTracker += nextMove;
-    longestPathLength ++;
-    longestPathMove = nextMove;
 
-
-
-
-//        int noValidPathFound = 0;
-//
-//        //loop to iterate through field width and find a valid path to end of field
-//        for (int j = 0; j <= FIELD_WIDTH; j++) {
-//
-//            if (noValidPathFound == 1){
-//                break;
-//            };
-//
-//            //if loop at end of field, break out of loop as valid path has been found
-//            if (j + 1 == FIELD_WIDTH) {
-//                validPathFound = 1;
-//                printf("Valid path found!\n");
-//                break;
-//            }
-
-//            //simulate next move
-//            for (int k = -1; k <= 1; k++) {
-//
-//                //check if the simulated move is not valid (out of bounds and not hitting an asteroid)
-//                //if it is not, move on to next loop
-//                if (checkForOutOfBounds(shipRow + offsetTracker) == 1 || checkForCollision(field, j, shipRow + offsetTracker) == 1){
-//                    if (k < 1){
-//                        continue;
-//                    }
-//                }else {
-//                    //if the simulated move is valid, break out of the loop and update offset tracker
-//                    offsetTracker += k;
-//                    break;
-//                }
-//
-//                //if the simulated move is the last move, and it is not valid, break out of the loop.
-//                //Update the longest path move to reflect the current next move if the longest path length is less than the current path length
-//                if (j > longestPathLength) {
-//                    longestPathLength = j;
-//                    longestPathMove = nextMove;
-//                    noValidPathFound = 1;
-//                }
-//                else {
-//                    noValidPathFound = 1;
-//                }
-//            }
-//        }
-//
-//        //if a valid path is found, break out of the loop
-//        if (validPathFound == 1) {
-//            nextMove = i;
-//            break;
-//        }
-
-//    //if no valid path is found, use the longest path move
-//    if (validPathFound == 0) {
-//        nextMove = longestPathMove;
-//        printf("using longest path move\n");
-//    }
+    free(validMoves);
 
     //struct creation and return
     struct ship_action turn = {nextMove, ship_state};
@@ -123,6 +111,7 @@ int findShipRow(int field[][FIELD_WIDTH]) {
             }
         }
     }
+    return -1;
 }
 
 int checkForCollision(int field[][FIELD_WIDTH], int currentColumn, int shipRow) {
@@ -149,4 +138,45 @@ int* findValidMoves(int field[][FIELD_WIDTH], int shipRow, int offsetTracker, in
         }
     }
     return validMoves;
+}
+
+int findValidPath(int field[][FIELD_WIDTH], int *validPathFound, int shipRow, int offsetTracker, int currentColumn, int *longestPathLength, int *longestPathMove, int currentMove) {
+
+
+
+    //check for successfully reaching the end of the field
+    if (currentColumn + 1 == FIELD_WIDTH) {
+        *validPathFound = 1;
+        return 1;
+    }
+    if (*validPathFound == 1) {
+        return 1;
+    }
+
+    //find valid moves for current column
+    int *validMoves = findValidMoves(field, shipRow + offsetTracker, offsetTracker, currentColumn);
+
+
+    currentColumn++;
+
+
+        for (int j = -1; j <= 1; j++) {
+            if (validMoves[j + 1] == 1) {
+                findValidPath(field, validPathFound, shipRow, offsetTracker + j, currentColumn, longestPathLength, longestPathMove, currentMove);
+            } else if (j == 1) {
+                if (*longestPathLength < currentColumn) {
+                    *longestPathLength = currentColumn;
+                    *longestPathMove = currentMove;
+            }
+            }
+
+    }
+
+
+    if (*validPathFound == 1) {
+        return 1;
+    } else {
+        return 0;
+    }
+
 }
